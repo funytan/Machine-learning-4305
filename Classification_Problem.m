@@ -45,6 +45,7 @@ net.trainParam.showWindow = true;
 net.trainParam.goal = 0;	
 net.trainParam.time = inf;
 net.trainParam.min_grad	= 1e-6;	
+% max.fail para changed to 8
 net.trainParam.max_fail	= 8;	
 net.trainParam.sigma = 5.0e-5;	
 net.trainParam.lambda = 5.0e-7;
@@ -67,41 +68,13 @@ for i=1:no_of_samples
 end
 
 %% This portion of the code stratifies the samples into having a equal proporton of 1-6, and 7-12 output samples in each set.
+% optional add-on to stratify the data set.
 
 [trainInd_1,valInd_1,testInd_1] = dividerand(i-1,0.7,0.15,.15);
 [trainInd_minority,valInd_minority,testInd_minority] = dividerand(no_of_samples-i+1,0.7,0.15,.15);
 trainInd_2 = trainInd_minority + i - 1;
 valInd_2 = valInd_minority + i - 1;
 testInd_2 = testInd_minority + i - 1;
-
-%% Add on: This portion of the code generates duplicate samples from the minority classes (7-12)
-
-% n denotes the number of times the minoriy classes are duplicated
-n = 10;
-
-x_minority = x_sorted(:,i:no_of_samples);
-
-trainInd_minority = trainInd_2;
-valInd_minority = valInd_2;
-testInd_minority = testInd_2;
-
-% creates new matrix with duplicated samples from minority classes
-for i=1:n
-    x_sorted = horzcat(x_sorted, x_minority);
-    
-    trainInd_minority = trainInd_minority + length(x_minority(1,:));
-    valInd_minority = valInd_minority + length(x_minority(1,:));
-    testInd_minority = testInd_minority + length(x_minority(1,:));
-    
-    trainInd_2 = horzcat(trainInd_2,trainInd_minority);
-    valInd_2 = horzcat(valInd_2,valInd_minority);
-    testInd_2 = horzcat(testInd_2,testInd_minority);
-end
-
-% update number of samples
-no_of_samples = size(x_sorted, 2);
-
-%% continue: This portion of the code stratifies the samples into having a equal proporton of 1-6, and 7-12 output samples in each set.
 
 trainInd_3 = horzcat(trainInd_1,trainInd_2);
 valInd_3 = horzcat(valInd_1,valInd_2);
@@ -113,10 +86,40 @@ trainInd_4 = trainInd_3(randperm(length(trainInd_3)));
 valInd_4 = valInd_3(randperm(length(valInd_3)));
 testInd_4 = testInd_3(randperm(length(testInd_3)));
 
+% selects minority class data from the training set, used later for
+% duplication
+x_minority = x_sorted(:,trainInd_2);
+
 %reorders columns in x to be in the order of training, validation and test
 %sets.
-order_x = horzcat(trainInd_4,valInd_4,testInd_4);
+order_x = horzcat(testInd_4,valInd_4,trainInd_4);
 x_sorted = x_sorted(:, order_x);
+
+%% Add on: This portion of the code generates duplicate samples from the minority classes (7-12)
+%temporary add-on to duplicate minority class for training set
+
+% n denotes the number of times the minoriy classes are duplicated
+n = 10;
+
+trainInd_minority = trainInd_2;
+
+% creates new matrix with duplicated samples from minority classes
+for i=1:n
+    x_sorted = horzcat(x_sorted, x_minority);
+end
+
+% update number of samples
+no_of_samples = size(x_sorted, 2);
+
+% samples for test set 
+x_temp = x_sorted(:,2401:no_of_samples);
+
+% scrambles samples that are part of the training set
+x_temp = x_temp(:,randperm(no_of_samples-2400));
+
+% recombines the samples
+x_sorted = horzcat(x_sorted(:,1:2400),x_temp);
+%% This portion of the code continues to stratify the samples into having a equal proporton of 1-6, and 7-12 output samples in each set.
 
 %takes the top 561 rows to be the new x matrix
 x = x_sorted(1:561,:);
@@ -128,15 +131,10 @@ for i = 1:no_of_samples
     t(x_sorted(562,i), i) = 1;
 end   
 
-end_train = floor(no_of_samples * 0.7);
-start_val = end_train + 1;
-end_val = floor(no_of_samples * 0.15) + start_val - 1;
-start_test = end_val + 1;
-
 net.divideFcn = 'divideind';
-net.divideParam.trainInd = 1:end_train;
-net.divideParam.valInd = start_val:end_val;
-net.divideParam.testInd = start_test:no_of_samples;
+net.divideParam.trainInd = 2401:no_of_samples
+net.divideParam.valInd = 1201:2400
+net.divideParam.testInd = 1:1200
 %% training the net
 [net,tr] = train(net,x,t);
 % view(net);
