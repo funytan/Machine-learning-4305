@@ -77,7 +77,7 @@ testInd_2 = testInd_minority + i - 1;
 %% Add on: This portion of the code generates duplicate samples from the minority classes (7-12)
 
 % n denotes the number of times the minoriy classes are duplicated
-n = 5;
+n = 10;
 
 x_minority = x_sorted(:,i:no_of_samples);
 
