@@ -23,12 +23,12 @@ end
 %transposing the haptAttr matrix to 561 by 8000
 x = haptAttr';
 
-%create new output matrix t, with 1 in the row corresponding to output
-Numofcategories = 12;
-t = zeros(Numofcategories,8000);
-for i = 1:8000
-    t(haptPosture(i), i) = 1;
-end   
+% %create new output matrix t, with 1 in the row corresponding to output
+% Numofcategories = 12;
+% t = zeros(Numofcategories,8000);
+% for i = 1:8000
+%     t(haptPosture(i), i) = 1;
+% end   
 %% declaring of neural network and activation functions
 % 100 hidden neurons in a single layer is ideal
 net = patternnet([100]); 
@@ -49,23 +49,60 @@ net.trainParam.max_fail	= 8;
 net.trainParam.sigma = 5.0e-5;	
 net.trainParam.lambda = 5.0e-7;
 
-%% This portion of the code stratifies the samples into having a equal proporton of 1-6, and 7-12 output samples in each set.
+%% This portion of the code sorts the samples by increasing ouput class.
 x_combined = [x;haptPosture'];
 [B, I] = sort(x_combined(562,:));
 % orders the inputs of the x matrix according to increasing outputs
 x_sorted = x_combined(:,I);
 
+%% This portion of the code stratifies the samples into having a equal proporton of 1-6, and 7-12 output samples in each set.
+
+no_of_samples = size(x_sorted, 2);
+
 %Find out where 7 starts in the new x matrix
-for i=1:8000
+for i=1:no_of_samples
     if x_sorted(562,i) == 7
         break;
     end
 end
+
+%% This portion of the code stratifies the samples into having a equal proporton of 1-6, and 7-12 output samples in each set.
+
 [trainInd_1,valInd_1,testInd_1] = dividerand(i-1,0.7,0.15,.15);
-[trainInd_2,valInd_2,testInd_2] = dividerand(8000-i+1,0.7,0.15,.15);
-trainInd_2 = trainInd_2 + i - 1;
-valInd_2 = valInd_2 + i - 1;
-testInd_2 = testInd_2 + i - 1;
+[trainInd_minority,valInd_minority,testInd_minority] = dividerand(no_of_samples-i+1,0.7,0.15,.15);
+trainInd_2 = trainInd_minority + i - 1;
+valInd_2 = valInd_minority + i - 1;
+testInd_2 = testInd_minority + i - 1;
+
+%% Add on: This portion of the code generates duplicate samples from the minority classes (7-12)
+
+% n denotes the number of times the minoriy classes are duplicated
+n = 5;
+
+x_minority = x_sorted(:,i:no_of_samples);
+
+trainInd_minority = trainInd_2;
+valInd_minority = valInd_2;
+testInd_minority = testInd_2;
+
+% creates new matrix with duplicated samples from minority classes
+for i=1:n
+    x_sorted = horzcat(x_sorted, x_minority);
+    
+    trainInd_minority = trainInd_minority + length(x_minority(1,:));
+    valInd_minority = valInd_minority + length(x_minority(1,:));
+    testInd_minority = testInd_minority + length(x_minority(1,:));
+    
+    trainInd_2 = horzcat(trainInd_2,trainInd_minority);
+    valInd_2 = horzcat(valInd_2,valInd_minority);
+    testInd_2 = horzcat(testInd_2,testInd_minority);
+end
+
+% update number of samples
+no_of_samples = size(x_sorted, 2);
+
+%% continue: This portion of the code stratifies the samples into having a equal proporton of 1-6, and 7-12 output samples in each set.
+
 trainInd_3 = horzcat(trainInd_1,trainInd_2);
 valInd_3 = horzcat(valInd_1,valInd_2);
 testInd_3 = horzcat(testInd_1,testInd_2);
@@ -79,7 +116,6 @@ testInd_4 = testInd_3(randperm(length(testInd_3)));
 %reorders columns in x to be in the order of training, validation and test
 %sets.
 order_x = horzcat(trainInd_4,valInd_4,testInd_4);
-x_test = x_sorted;
 x_sorted = x_sorted(:, order_x);
 
 %takes the top 561 rows to be the new x matrix
@@ -87,15 +123,20 @@ x = x_sorted(1:561,:);
 
 %create new output matrix t, with 1 in the row corresponding to output
 Numofcategories = 12;
-t = zeros(Numofcategories,8000);
-for i = 1:8000
+t = zeros(Numofcategories,no_of_samples);
+for i = 1:no_of_samples
     t(x_sorted(562,i), i) = 1;
 end   
 
+end_train = floor(no_of_samples * 0.7);
+start_val = end_train + 1;
+end_val = floor(no_of_samples * 0.15) + start_val - 1;
+start_test = end_val + 1;
+
 net.divideFcn = 'divideind';
-net.divideParam.trainInd = 1:5600;
-net.divideParam.valInd = 5601:6800;
-net.divideParam.testInd = 6801:8000;
+net.divideParam.trainInd = 1:end_train;
+net.divideParam.valInd = start_val:end_val;
+net.divideParam.testInd = start_test:no_of_samples;
 %% training the net
 [net,tr] = train(net,x,t);
 % view(net);
